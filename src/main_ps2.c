@@ -3,8 +3,8 @@
  *
  * O jogo desenha cada quadro por software (gfx.c) num buffer de 640x448
  * na RAM do EE; aqui esse buffer é enviado ao GS como textura e esticado
- * para a tela inteira (NTSC 640x448 ou PAL 640x512). O controle é lido
- * com a libpad (módulos SIO2MAN/PADMAN da ROM do console).
+ * para a tela inteira (NTSC 640x448 ou PAL 640x512). Os controles 1 e 2
+ * são lidos com a libpad (módulos SIO2MAN/PADMAN da ROM do console).
  */
 #include <kernel.h>
 #include <tamtypes.h>
@@ -30,8 +30,8 @@ extern unsigned char audsrv_irx[];
 extern unsigned int size_audsrv_irx;
 extern void *_gp;
 
-static char pad_buf[256] __attribute__((aligned(64)));
-static int pad_ok;
+static char pad_buf[2][256] __attribute__((aligned(64)));
+static int pad_ok[2];
 
 static void reset_iop(void)
 {
@@ -102,23 +102,28 @@ static void init_pad(void)
     SifLoadModule("rom0:SIO2MAN", 0, NULL);
     SifLoadModule("rom0:PADMAN", 0, NULL);
     padInit(0);
-    pad_ok = padPortOpen(0, 0, pad_buf) != 0;
+    pad_ok[0] = padPortOpen(0, 0, pad_buf[0]) != 0;
+    pad_ok[1] = padPortOpen(1, 0, pad_buf[1]) != 0;
 }
 
-/* Lê o controle 1 e devolve os botões recém-apertados (com auto-repetição
- * no direcional, para andar rápido pelos menus segurando o botão). */
-static unsigned int read_pad(void)
+/* Lê o controle da porta indicada (0 = controle 1, 1 = controle 2) e
+ * devolve os botões recém-apertados (com auto-repetição no direcional,
+ * para andar rápido pelos menus segurando o botão). */
+static unsigned int read_pad(int port)
 {
-    static unsigned int prev;
-    static int hold;
+    static unsigned int prev[2];
+    static int hold[2];
     struct padButtonStatus st;
     unsigned int cur = 0, pressed;
     int state;
 
-    if (!pad_ok)
+    if (!pad_ok[port]) {
+        ui_set_pad_connected(port, 0);
         return 0;
-    state = padGetState(0, 0);
-    if ((state == PAD_STATE_STABLE || state == PAD_STATE_FINDCTP1) && padRead(0, 0, &st) != 0) {
+    }
+    state = padGetState(port, 0);
+    ui_set_pad_connected(port, state != PAD_STATE_DISCONN);
+    if ((state == PAD_STATE_STABLE || state == PAD_STATE_FINDCTP1) && padRead(port, 0, &st) != 0) {
         unsigned int d = 0xffff ^ st.btns;
         if (d & PAD_UP) cur |= B_UP;
         if (d & PAD_DOWN) cur |= B_DOWN;
@@ -133,14 +138,14 @@ static unsigned int read_pad(void)
         if (d & PAD_L1) cur |= B_L1;
         if (d & PAD_R1) cur |= B_R1;
     }
-    pressed = cur & ~prev;
+    pressed = cur & ~prev[port];
     if (cur & (B_UP | B_DOWN | B_LEFT | B_RIGHT)) {
-        if (++hold > 20 && (hold % 6) == 0)
+        if (++hold[port] > 20 && (hold[port] % 6) == 0)
             pressed |= cur & (B_UP | B_DOWN | B_LEFT | B_RIGHT);
     } else {
-        hold = 0;
+        hold[port] = 0;
     }
-    prev = cur;
+    prev[port] = cur;
     return pressed;
 }
 
@@ -180,7 +185,9 @@ int main(int argc, char *argv[])
     init_audio();
 
     while (1) {
-        ui_update(read_pad());
+        unsigned int p1 = read_pad(0);
+        unsigned int p2 = read_pad(1);
+        ui_update(p1, p2);
         ui_draw_to((unsigned int *)tex.Mem);
         FlushCache(0); /* garante que a textura saiu do cache antes do DMA */
 

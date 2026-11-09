@@ -85,6 +85,11 @@ static const char *const strings[NUM_STRINGS][NUM_LANGS] = {
     [S_SEE_TOWNS] = { "Ver cidades", "See towns", "Ver ciudades" },
     [S_NAME_MAYOR] = { "Prefeito", "Mayor", "Alcalde" },
 
+    [S_PAD_N] = { "Controle %d", "Controller %d", "Mando %d" },
+    [S_PAD_PLUG] = { "Conecte o controle %d", "Plug in controller %d", "Conecta el mando %d" },
+    [S_WRONG_PAD] = { "Vez de %s: use o controle %d.", "%s's turn: use controller %d.",
+                      "Turno de %s: usa el mando %d." },
+
     [S_RULE_T0] = { "Objetivo", "Goal", "Objetivo" },
     [S_RULE_T1] = { "Seu turno", "Your turn", "Tu turno" },
     [S_RULE_T2] = { "Prefeitos e pedidos", "Mayors and requests", "Alcaldes y peticiones" },
@@ -92,22 +97,22 @@ static const char *const strings[NUM_STRINGS][NUM_LANGS] = {
 
     [S_RULE_B0] = {
         "Os fantasminhas do Além querem eleger prefeitos para 6 novas cidades! "
-        "Joguem juntos (1 a 6 jogadores, passando o controle) para formar 6 cidades "
-        "com 4 cartas cada.\n\n"
+        "Joguem juntos para formar 6 cidades com 4 cartas cada. O controle 1 é do "
+        "Jogador 1; o controle 2 é passado entre os Jogadores 2 a 6.\n\n"
         "A primeira carta de cada cidade vira o PREFEITO, e o pedido escrito nela "
         "precisa ser cumprido.\n\n"
         "Quando as 24 cartas forem jogadas, vocês vencem se os 6 prefeitos estiverem satisfeitos.",
 
         "The little ghosts of the Beyond want to elect mayors for 6 new towns! "
-        "Play together (1 to 6 players, passing the controller) to build 6 towns "
-        "of 4 cards each.\n\n"
+        "Play together to build 6 towns of 4 cards each. Controller 1 belongs to "
+        "Player 1; controller 2 is passed among Players 2 to 6.\n\n"
         "The first card of each town becomes its MAYOR, and the request written on it "
         "must be met.\n\n"
         "When all 24 cards are played, you win if all 6 mayors are satisfied.",
 
         "¡Los fantasmitas del Más Allá quieren elegir alcaldes para 6 nuevas ciudades! "
-        "Jugad juntos (de 1 a 6 jugadores, pasando el mando) para formar 6 ciudades "
-        "de 4 cartas cada una.\n\n"
+        "Jugad juntos para formar 6 ciudades de 4 cartas cada una. El mando 1 es del "
+        "Jugador 1; el mando 2 se pasa entre los Jugadores 2 a 6.\n\n"
         "La primera carta de cada ciudad es su ALCALDE, y la petición escrita en ella "
         "debe cumplirse.\n\n"
         "Cuando se jueguen las 24 cartas, ganáis si los 6 alcaldes están satisfechos.",

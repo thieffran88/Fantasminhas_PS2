@@ -47,6 +47,20 @@ static u32 bg[SCR_W * SCR_H] __attribute__((aligned(64)));
 static u32 cache[SCR_W * SCR_H] __attribute__((aligned(64)));
 static int bg_ready, dirty = 1;
 
+static int pad_connected[2] = { 1, 1 };
+
+/* Controle de cada jogador: o 1 é só do Jogador 1; o 2 serve os demais. */
+static int pad_of_player(int player) { return player == 0 ? 0 : 1; }
+static int active_pad(void) { return pad_of_player(G.player); }
+
+void ui_set_pad_connected(int port, int on)
+{
+    if (port >= 0 && port < 2 && pad_connected[port] != on) {
+        pad_connected[port] = on;
+        dirty = 1;
+    }
+}
+
 const Game *ui_game(void) { return &G; }
 int ui_screen(void) { return screen; }
 int ui_town_sel(void) { return town_sel; }
@@ -222,12 +236,24 @@ static void move_town_cursor(unsigned int p)
     town_sel = r * 3 + c;
 }
 
-static void update_game(unsigned int p)
+#define TURN_BUTTONS (B_UP | B_DOWN | B_LEFT | B_RIGHT | B_CROSS)
+
+/* any = botões dos dois controles (pausa e regras valem para todos);
+ * p = só os do controle do jogador da vez (ações do turno). */
+static void update_game(unsigned int any, unsigned int p, unsigned int other)
 {
     if (anim_t >= 0)
         return; /* animação em andamento */
     if (G.result != GS_PLAYING)
         return;
+    if (other & TURN_BUTTONS) {
+        /* o controle errado tentou jogar: avisa de quem é a vez */
+        char b[96];
+        snprintf(b, sizeof b, TR(S_WRONG_PAD), player_name(G.player), active_pad() + 1);
+        set_toast(b);
+        audio_sfx(SFX_ERROR);
+    }
+    p |= any & (B_START | B_TRIANGLE);
     if (p & B_START) {
         screen = SCR_PAUSE;
         pause_sel = 0;
@@ -339,16 +365,22 @@ static void update_end(unsigned int p)
     }
 }
 
-void ui_update(unsigned int p)
+void ui_update(unsigned int p1, unsigned int p2)
 {
     int prev_screen = screen;
+    unsigned int p = p1 | p2; /* menus, regras, pausa e fim: qualquer controle */
     frame++;
     if (p)
         dirty = 1;
     switch (screen) {
     case SCR_TITLE: update_title(p); break;
     case SCR_RULES: update_rules(p); break;
-    case SCR_GAME: update_game(p); break;
+    case SCR_GAME: {
+        unsigned int mine = active_pad() == 0 ? p1 : p2;
+        unsigned int other = active_pad() == 0 ? p2 : p1;
+        update_game(p, mine, other);
+        break;
+    }
     case SCR_PAUSE: update_pause(p); break;
     case SCR_END: update_end(p); break;
     }
@@ -492,10 +524,24 @@ static void draw_town(int i, int selected, int preview)
     }
 }
 
+/* selo "Controle N" do jogador da vez (vermelho se desconectado) */
+static void pad_badge(int cx, int y)
+{
+    char b[48];
+    int pad = active_pad(), w;
+    int ok = pad_connected[pad];
+    snprintf(b, sizeof b, TR(ok ? S_PAD_N : S_PAD_PLUG), pad + 1);
+    w = gfx_text_width(&font_small, b) + 20;
+    gfx_rrect_border(cx - w / 2, y, w, 24, 12, 2, COL_OUTLINE, ok ? 0x4A2D7A : COL_BAD, 255);
+    gfx_text_al(&font_small, cx, y + 4, ALIGN_CENTER, b, 0xFFFFFF, 255);
+}
+
 static void draw_header(void)
 {
     char b[64];
     art_title_text(22 + gfx_text_width(&font_big, "Prefeitos do Além") / 2, 9, "Prefeitos do Além", COL_GOLD);
+    if (G.result == GS_PLAYING)
+        pad_badge(340, 12);
     snprintf(b, sizeof b, TR(S_CARDS_PLAYED), G.played, CARDS_TO_PLAY);
     gfx_text_al(&font_body, 618, 8, ALIGN_RIGHT, b, COL_TEXT, 255);
     if (G.nplayers > 1)

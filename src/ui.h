@@ -18,8 +18,12 @@
 #define B_R1 (1 << 11)
 
 void ui_init(unsigned int seed);
-/* pressed = botões que acabaram de ser apertados neste quadro */
-void ui_update(unsigned int pressed);
+/* botões que acabaram de ser apertados neste quadro em cada controle.
+ * Na partida, o controle 1 joga só o turno do Jogador 1 e o controle 2
+ * joga os turnos dos Jogadores 2 a 6; menus aceitam os dois. */
+void ui_update(unsigned int pad1, unsigned int pad2);
+/* informa se o controle (0 ou 1) está conectado, para avisar na tela */
+void ui_set_pad_connected(int port, int on);
 
 /* desenha o quadro atual no buffer (SCR_W x SCR_H, formato GS CT32) */
 void ui_draw_to(unsigned int *out);

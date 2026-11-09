@@ -1,7 +1,9 @@
 /*
  * Versão de PC (sem janela) usada para testar o jogo e gerar capturas.
  * Uso: prefeitos_host [--seed N] comando...
- *   U D L R X O T Q ST SE L1 R1  -> aperta um botão (Q = quadrado, T = triângulo)
+ *   U D L R X O T Q ST SE L1 R1  -> aperta um botão no controle 1 (Q = quadrado, T = triângulo)
+ *   2:X, 2:R...                  -> o mesmo no controle 2
+ *   P2OFF                        -> simula o controle 2 desconectado
  *   wN                           -> espera N quadros
  *   A                            -> joga um turno automático (apertando os botões)
  *   @arquivo.ppm                 -> salva a tela atual
@@ -35,9 +37,11 @@ static void save_ppm(const char *path)
 }
 
 /* só desenha quando vai salvar uma captura (deixa os testes rápidos) */
+static int cur_pad; /* controle usado pelos comandos (0 = controle 1) */
+
 static void step(unsigned int pressed)
 {
-    ui_update(pressed);
+    ui_update(cur_pad == 0 ? pressed : 0, cur_pad == 1 ? pressed : 0);
 }
 
 static unsigned int parse_btn(const char *s)
@@ -78,6 +82,7 @@ static void auto_turn(void)
     int best = -100000, bt = 0, bsrc = 0, src, t, cur, guard = 0;
     if (ui_screen() != 2 || g->result != GS_PLAYING || g->hand >= 0)
         return; /* só joga durante a compra de uma partida em andamento */
+    cur_pad = g->player == 0 ? 0 : 1; /* usa o controle do jogador da vez */
     for (src = 0; src < 2; src++) {
         Game d = *g;
         if (!(src ? game_draw_tourist(&d) : game_draw_deck(&d)))
@@ -106,6 +111,7 @@ static void auto_turn(void)
     if (cur / 3 != bt / 3)
         press(B_DOWN);
     press(B_CROSS);
+    cur_pad = 0;
 }
 
 static void write_wav(const char *path, const short *pcm, int n)
@@ -183,6 +189,8 @@ int main(int argc, char **argv)
         if (a[0] == '@') {
             ui_draw_to(screen_buf);
             save_ppm(a + 1);
+        } else if (!strcmp(a, "P2OFF")) {
+            ui_set_pad_connected(1, 0);
         } else if (!strcmp(a, "A")) {
             auto_turn();
         } else if (a[0] == 'w') {
@@ -190,13 +198,18 @@ int main(int argc, char **argv)
             while (n-- > 0)
                 step(0);
         } else {
-            unsigned int b = parse_btn(a);
+            unsigned int b;
+            cur_pad = (a[0] == '2' && a[1] == ':') ? 1 : 0;
+            if (cur_pad)
+                a += 2;
+            b = parse_btn(a);
             if (!b) {
                 fprintf(stderr, "comando desconhecido: %s\n", a);
                 return 1;
             }
             step(b);
             step(0);
+            cur_pad = 0;
         }
     }
     {

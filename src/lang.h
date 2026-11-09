@@ -70,6 +70,9 @@ enum {
     S_BTN_TITLE,
     S_SEE_TOWNS,
     S_NAME_MAYOR,
+    S_PAD_N,              /* %d */
+    S_PAD_PLUG,           /* %d */
+    S_WRONG_PAD,          /* %s %d */
     S_RULE_T0, S_RULE_T1, S_RULE_T2, S_RULE_T3,
     S_RULE_B0, S_RULE_B1, S_RULE_B2, S_RULE_B3,
     NUM_STRINGS

@@ -48,6 +48,11 @@ MID_EN="R X X w5"
 for k in $(seq 1 13); do MID_EN="$MID_EN A w20"; done
 $B --seed $SEED $MID_EN w30 X w2 @$OUT/12_jogada_en.ppm >/dev/null
 
+# dois controles: o controle 2 tenta jogar na vez do Jogador 1 (aviso) e,
+# na vez do Jogador 2, o controle 2 está desconectado
+$B X X w5 2:X w2 @$OUT/13_controle_errado.ppm >/dev/null
+$B X X w5 X X w30 P2OFF w2 @$OUT/14_conecte_controle2.ppm >/dev/null
+
 for f in $OUT/*.ppm; do
   python3 -c "import sys;from PIL import Image;Image.open(sys.argv[1]).save(sys.argv[1][:-4]+'.png')" "$f" && rm "$f"
 done

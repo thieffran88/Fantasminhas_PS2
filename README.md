@@ -1,7 +1,7 @@
 # Prefeitos do Além (PS2)
 
 Jogo de cartas **cooperativo** para PlayStation 2 (homebrew), de 1 a 6 jogadores
-passando o controle. Os fantasminhas do Além querem eleger prefeitos para 6 novas
+com dois controles. Os fantasminhas do Além querem eleger prefeitos para 6 novas
 cidades, e cada prefeito tem um pedido que precisa ser cumprido.
 
 ![Abertura](screenshots/01_abertura.png)
@@ -78,6 +78,13 @@ Com as **Dicas** ligadas (menu inicial), o jogo avisa antes de você confirmar u
 jogada que tornaria algum pedido impossível.
 
 ## Controles
+
+**Dois controles:** o **controle 1** joga só os turnos do Jogador 1, e o
+**controle 2** joga os turnos dos Jogadores 2 a 6 (passem o controle 2 entre
+eles). Na partida, o controle que não é da vez não mexe nas cartas: o jogo avisa
+"use o controle N", e o selo no topo da tela mostra qual controle joga agora
+(fica vermelho se o controle 2 estiver desconectado). Menus, regras, pausa
+(START) e a tela final aceitam os dois controles. Jogando sozinho, use o controle 1.
 
 | Botão | Ação |
 |---|---|
