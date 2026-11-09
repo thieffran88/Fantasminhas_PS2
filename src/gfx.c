@@ -227,6 +227,33 @@ void gfx_line(float x0, float y0, float x1, float y1, float thick, int rgb, int 
     gfx_circle(x1, y1, h, rgb, alpha);
 }
 
+void gfx_blit(const u32 *px, int w, int h, int x, int y, int alpha)
+{
+    int i, j, i0 = 0, j0 = 0, i1 = w, j1 = h;
+    if (x < 0) i0 = -x;
+    if (y < 0) j0 = -y;
+    if (x + w > SCR_W) i1 = SCR_W - x;
+    if (y + h > SCR_H) j1 = SCR_H - y;
+    if (alpha <= 0)
+        return;
+    for (j = j0; j < j1; j++) {
+        const u32 *s = px + j * w;
+        u32 *d = fb + (y + j) * SCR_W + x;
+        for (i = i0; i < i1; i++) {
+            u32 p = s[i];
+            int a = (int)(p >> 24);
+            if (!a)
+                continue;
+            if (alpha < 255)
+                a = a * (alpha + 1) >> 8;
+            if (a >= 255)
+                d[i] = p | 0x80000000u;
+            else
+                blend_px(x + i, y + j, p, a);
+        }
+    }
+}
+
 void gfx_dashed_rect(int x, int y, int w, int h, int dash, int t, int rgb, int alpha)
 {
     int i;

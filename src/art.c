@@ -4,6 +4,7 @@
 
 #include "game.h"
 #include "gfx.h"
+#include "sprites.h"
 
 void art_init(void)
 {
@@ -25,38 +26,21 @@ static unsigned int rnd(void)
 
 void art_background(void)
 {
-    int i;
+    int i, j;
+    const Sprite *strip = spr(SPR_BG_NOITE);
+    int sy = SCR_H - strip->h;
     bg_rng = 0x9E3779B9u;
-    gfx_vgrad(0, 0, SCR_W, SCR_H, 0x120A26, 0x3B2350);
+    gfx_vgrad(0, 0, SCR_W, sy + 30, 0x0E0820, 0x2A1F7A);
     /* estrelas */
     for (i = 0; i < 90; i++) {
-        int x = (int)(rnd() % SCR_W), y = (int)(rnd() % 300);
+        int x = (int)(rnd() % SCR_W), y = (int)(rnd() % (unsigned)sy);
         int a = 90 + (int)(rnd() % 150);
         gfx_fill(x, y, 1 + (int)(rnd() % 3 == 0), 1, 0xFFF6D8, a);
     }
-    /* lua com brilho */
-    for (i = 6; i >= 1; i--)
-        gfx_circle(560, 70, 34 + i * 9, 0xC8B8FF, 10);
-    gfx_circle(560, 70, 36, 0xFFF4D6, 255);
-    gfx_circle(548, 62, 7, 0xEFE0BC, 255);
-    gfx_circle(572, 84, 5, 0xEFE0BC, 255);
-    gfx_circle(566, 56, 4, 0xEFE0BC, 255);
-    /* colinas */
-    gfx_ellipse(120, 470, 260, 120, 0x2A1840, 255);
-    gfx_ellipse(470, 480, 320, 130, 0x24143A, 255);
-    /* casinhas em silhueta com janelas acesas */
-    for (i = 0; i < 9; i++) {
-        int x = 20 + i * 70 + (int)(rnd() % 20);
-        int h = 26 + (int)(rnd() % 26);
-        int base = 400 + (int)(rnd() % 20);
-        gfx_fill(x, base - h, 34, h + 60, 0x1A0E2C, 255);
-        gfx_tri((float)x - 5, (float)(base - h), (float)x + 39, (float)(base - h), (float)x + 17,
-                (float)(base - h - 18), 0x1A0E2C, 255);
-        gfx_fill(x + 8, base - h + 8, 6, 7, 0xFFD45A, 200);
-        if (rnd() & 1)
-            gfx_fill(x + 20, base - h + 8, 6, 7, 0xFFD45A, 160);
-    }
-    gfx_fill(0, 430, SCR_W, 18, 0x150A24, 255);
+    /* vilarejo noturno da folha de sprites, com a parte de cima esfumaçada */
+    spr_draw(SPR_BG_NOITE, 0, sy, 255);
+    for (j = 0; j < 36; j++)
+        gfx_fill(0, sy + j, SCR_W, 1, 0x2A1F7A, 255 - j * 7);
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,7 +93,23 @@ static void shop(float cx, float cy, float s, int a)
     gfx_fill((int)(cx + 0.06f * s), (int)(cy + 0.12f * s), (int)(0.17f * s), (int)(0.3f * s), 0x7A3A12, a);
 }
 
+static const int lm_sprite[4][NUM_LM] = {
+    { SPR_LM_CASA_18, SPR_LM_ARVORE_18, SPR_LM_LAGO_18, SPR_LM_LOJA_18 },
+    { SPR_LM_CASA_24, SPR_LM_ARVORE_24, SPR_LM_LAGO_24, SPR_LM_LOJA_24 },
+    { SPR_LM_CASA_34, SPR_LM_ARVORE_34, SPR_LM_LAGO_34, SPR_LM_LOJA_34 },
+    { SPR_LM_CASA_56, SPR_LM_ARVORE_56, SPR_LM_LAGO_56, SPR_LM_LOJA_56 },
+};
+
 void art_landmark(int type, float cx, float cy, float s, int alpha)
+{
+    int k = s < 23 ? 0 : (s < 30 ? 1 : (s < 45 ? 2 : 3));
+    if (type < 0 || type >= NUM_LM)
+        return;
+    spr_draw_center(lm_sprite[k][type], (int)cx, (int)cy, alpha);
+}
+
+/* versões desenhadas com formas (usadas só como reserva) */
+void art_landmark_shapes(int type, float cx, float cy, float s, int alpha)
 {
     switch (type) {
     case CASA: house(cx, cy, s, alpha); break;
@@ -203,7 +203,7 @@ void art_card_face(int x, int y, int w, int h, int card, int edge)
     const Card *c = &card_db[card];
     float s = (float)(w < h / 2 ? w : h / 2) * 0.95f;
     gfx_rrect(x + 2, y + 3, w, h, 5, 0x000000, 70);
-    gfx_rrect_border(x, y, w, h, 5, 2, edge, COL_CARD, 255);
+    gfx_rrect_border(x, y, w, h, 5, 2, edge == COL_GOLD ? COL_GOLD : COL_OUTLINE, COL_CARD, 255);
     art_landmark(c->lm[0], x + w * 0.5f, y + h * 0.27f, s, 255);
     art_landmark(c->lm[1], x + w * 0.5f, y + h * 0.71f, s, 255);
 }
@@ -216,7 +216,12 @@ void art_card_back(int x, int y, int w, int h, int star)
     if (star)
         art_star(x + w * 0.5f, y + h * 0.5f, w * 0.28f, COL_GOLD, 255);
     else
-        art_ghost(x + w * 0.5f, y + h * 0.5f, w * 0.5f, 1, 230);
+    {
+        if (w >= 48)
+            spr_draw_center(SPR_EXPR_NORMAL, x + w / 2, y + h / 2, 255);
+        else
+            art_ghost(x + w * 0.5f, y + h * 0.5f, w * 0.5f, 1, 230);
+    }
 }
 
 void art_button(int type, int x, int y)
@@ -241,4 +246,25 @@ void art_button(int type, int x, int y)
         gfx_fill(x - 2, y - 2, 4, 4, 0x3A2E52, 255);
         break;
     }
+}
+
+void art_menu_button(int cx, int y, int w, int h, const char *label, int selected)
+{
+    int x = cx - w / 2;
+    gfx_rrect(x + 2, y + 4, w, h, h / 2, 0x000000, 110);
+    gfx_rrect_border(x, y, w, h, h / 2, 3, COL_OUTLINE, selected ? 0xFFC928 : 0x4A2D7A, 255);
+    /* brilho na metade de cima */
+    gfx_rrect(x + 6, y + 5, w - 12, h / 2 - 5, (h / 2 - 5) / 2, selected ? 0xFFE27A : 0x5E3C94, 255);
+    gfx_text_al(&font_big, cx, y + (h - 30) / 2, ALIGN_CENTER, label, selected ? COL_OUTLINE : 0xFFFFFF, 255);
+}
+
+void art_title_text(int cx, int y, const char *s, int rgb)
+{
+    static const int off[8][2] = { { -2, 0 }, { 2, 0 }, { 0, -2 }, { 0, 2 },
+                                   { -2, -2 }, { 2, 2 }, { -2, 2 }, { 2, -2 } };
+    int i;
+    gfx_text_al(&font_big, cx + 2, y + 4, ALIGN_CENTER, s, 0x000000, 140);
+    for (i = 0; i < 8; i++)
+        gfx_text_al(&font_big, cx + off[i][0], y + off[i][1], ALIGN_CENTER, s, COL_OUTLINE, 255);
+    gfx_text_al(&font_big, cx, y, ALIGN_CENTER, s, rgb, 255);
 }

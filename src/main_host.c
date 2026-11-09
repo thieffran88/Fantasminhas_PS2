@@ -3,6 +3,7 @@
  * Uso: prefeitos_host [--seed N] comando...
  *   U D L R X O T Q ST SE L1 R1  -> aperta um botão (Q = quadrado, T = triângulo)
  *   wN                           -> espera N quadros
+ *   A                            -> joga um turno automático (apertando os botões)
  *   @arquivo.ppm                 -> salva a tela atual
  */
 #include <stdio.h>
@@ -32,10 +33,10 @@ static void save_ppm(const char *path)
     fclose(f);
 }
 
+/* só desenha quando vai salvar uma captura (deixa os testes rápidos) */
 static void step(unsigned int pressed)
 {
     ui_update(pressed);
-    ui_draw_to(screen_buf);
 }
 
 static unsigned int parse_btn(const char *s)
@@ -52,6 +53,60 @@ static unsigned int parse_btn(const char *s)
     return 0;
 }
 
+static void press(unsigned int b)
+{
+    step(b);
+    step(0);
+}
+
+static int score_state(const Game *g)
+{
+    int i, s = 0;
+    if (g->result == GS_LOST)
+        return -1000;
+    for (i = 0; i < g->ntowns; i++)
+        s += game_req_status(g, i) == ST_MET ? 3 : 0;
+    return s;
+}
+
+/* escolhe a melhor jogada imediata (olhando a carta do monte, só para a demo)
+ * e executa apertando os mesmos botões que um jogador apertaria */
+static void auto_turn(void)
+{
+    const Game *g = ui_game();
+    int best = -100000, bt = 0, bsrc = 0, src, t, cur, guard = 0;
+    if (ui_screen() != 2 || g->result != GS_PLAYING || g->hand >= 0)
+        return; /* só joga durante a compra de uma partida em andamento */
+    for (src = 0; src < 2; src++) {
+        Game d = *g;
+        if (!(src ? game_draw_tourist(&d) : game_draw_deck(&d)))
+            continue;
+        for (t = 0; t <= d.ntowns && t < MAX_TOWNS; t++) {
+            Game e = d;
+            int sc;
+            if (!game_play(&e, t))
+                continue;
+            sc = score_state(&e) * 10 + (int)(game_rand(&e) % 7);
+            if (sc > best) {
+                best = sc;
+                bt = t;
+                bsrc = src;
+            }
+        }
+    }
+    if (bsrc)
+        press(B_RIGHT);
+    press(B_CROSS);
+    cur = ui_town_sel();
+    while (cur % 3 != bt % 3 && guard++ < 3) {
+        press(B_RIGHT);
+        cur = ui_town_sel();
+    }
+    if (cur / 3 != bt / 3)
+        press(B_DOWN);
+    press(B_CROSS);
+}
+
 int main(int argc, char **argv)
 {
     int i = 1;
@@ -65,7 +120,10 @@ int main(int argc, char **argv)
     for (; i < argc; i++) {
         const char *a = argv[i];
         if (a[0] == '@') {
+            ui_draw_to(screen_buf);
             save_ppm(a + 1);
+        } else if (!strcmp(a, "A")) {
+            auto_turn();
         } else if (a[0] == 'w') {
             int n = atoi(a + 1);
             while (n-- > 0)

@@ -7,13 +7,21 @@ OUT=screenshots
 mkdir -p "$OUT"
 $B w40 @$OUT/01_titulo.ppm >/dev/null
 $B D D D X w2 @$OUT/02_regras.ppm R R @$OUT/03_regras_prefeitos.ppm >/dev/null
-# meio de partida: alterna fundar cidades e completar as existentes
-MID="X w5"
-for k in 1 2 3 4 5 6 7 8 9; do
-  case $k in 1|3|5|8) MID="$MID X X w20" ;; 2|6) MID="$MID R X X w20" ;; *) MID="$MID R X D X w20" ;; esac
+# meio de partida com jogadas automáticas: procura uma semente que chegue
+# a 13 cartas sem perder
+for s in $(seq 1 300); do
+  if $B --seed $s X w5 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 \
+       | grep -q "tela=2 jogadas=13 .*resultado=0"; then SEED=$s; break; fi
 done
-$B --seed 11 $MID R X @$OUT/04_turista.ppm L X w2 R @$OUT/05_jogada.ppm >/dev/null
-$B --seed 11 $MID ST @$OUT/06_pausa.ppm >/dev/null
+MID="X w5 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20 A w20"
+$B --seed $SEED $MID w30 R @$OUT/04_turista.ppm X w2 @$OUT/05_jogada.ppm >/dev/null
+$B --seed $SEED $MID ST @$OUT/06_pausa.ppm >/dev/null
+# vitória (procura uma semente em que a jogada automática vence)
+for s in $(seq 1 400); do
+  W="X w5"; for k in $(seq 1 24); do W="$W A w20"; done
+  if $B --seed $s $W w60 | grep -q "tela=4 jogadas=24 .*resultado=1"; then
+    $B --seed $s $W w60 @$OUT/08_vitoria.ppm >/dev/null; break; fi
+done
 # joga sempre na primeira cidade livre até a partida acabar (tela final)
 END="X w5"
 for k in $(seq 1 24); do

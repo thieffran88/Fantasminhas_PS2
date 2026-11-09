@@ -29,6 +29,8 @@ void gfx_quad(float x0, float y0, float x1, float y1, float x2, float y2, float 
 void gfx_rrect(int x, int y, int w, int h, int r, int rgb, int alpha);
 void gfx_rrect_border(int x, int y, int w, int h, int r, int t, int border, int fill, int alpha);
 void gfx_line(float x0, float y0, float x1, float y1, float thick, int rgb, int alpha);
+/* copia pixels com alfa por pixel (byte alto = alfa 0..255, RGB no formato da tela) */
+void gfx_blit(const u32 *px, int w, int h, int x, int y, int alpha);
 void gfx_dashed_rect(int x, int y, int w, int h, int dash, int t, int rgb, int alpha);
 
 /* Texto (UTF-8). Bytes 0x01..0x04 trocam a cor para gfx_lm_colors[n-1];

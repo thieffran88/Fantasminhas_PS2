@@ -6,6 +6,7 @@
 
 #include "art.h"
 #include "gfx.h"
+#include "sprites.h"
 
 enum { SCR_TITLE, SCR_RULES, SCR_GAME, SCR_PAUSE, SCR_END };
 enum { PH_DRAW, PH_PLACE };
@@ -29,6 +30,14 @@ static unsigned int seed;
 static int end_delay, hide_overlay;
 
 static int anim_t = -1, anim_town, anim_slot;
+static int happy_town = -1, happy_t; /* prefeito animado depois de receber carta */
+
+/* cada jogador é um dos fantasminhas das folhas de sprites */
+static const char *const player_names[6] = { "Zaca", "Nina", "Lili", "Beto", "Dona Nena", "Prefeito" };
+static const int player_avatar[6] = { SPR_AVATAR_ZACA, SPR_AVATAR_NINA, SPR_AVATAR_LILI,
+                                      SPR_AVATAR_BETO, SPR_AVATAR_NENA, SPR_AVATAR_PREFEITO };
+static const int title_chars[6] = { SPR_CHAR_PREFEITO, SPR_CHAR_ZACA, SPR_CHAR_NINA,
+                                    SPR_CHAR_LILI, SPR_CHAR_BETO, SPR_CHAR_NENA };
 static char toast[128];
 static int toast_t;
 
@@ -38,6 +47,7 @@ static int bg_ready, dirty = 1;
 
 const Game *ui_game(void) { return &G; }
 int ui_screen(void) { return screen; }
+int ui_town_sel(void) { return town_sel; }
 
 static void town_xy(int i, int *x, int *y)
 {
@@ -80,12 +90,21 @@ static void new_game(void)
     hide_overlay = 0;
     toast_t = 0;
     screen = SCR_GAME;
-    set_toast("Boa sorte, fantasminhas!");
+    happy_town = -1;
+    {
+        char b[64];
+        if (G.nplayers > 1)
+            snprintf(b, sizeof b, "Boa sorte! %s começa.", player_names[0]);
+        else
+            snprintf(b, sizeof b, "Boa sorte, fantasminha!");
+        set_toast(b);
+    }
 }
 
 void ui_init(unsigned int s)
 {
     seed = s;
+    sprites_init();
     art_init();
     screen = SCR_TITLE;
     dirty = 1;
@@ -188,9 +207,15 @@ static void update_game(unsigned int p)
                 anim_slot = slot;
                 phase = PH_DRAW;
                 draw_sel = 0;
+                happy_town = t;
+                happy_t = 70;
                 if (newtown) {
                     char b[96];
                     snprintf(b, sizeof b, "Cidade %d fundada: novo prefeito eleito!", t + 1);
+                    set_toast(b);
+                } else if (G.nplayers > 1 && G.result == GS_PLAYING) {
+                    char b[64];
+                    snprintf(b, sizeof b, "Vez de %s!", player_names[G.player]);
                     set_toast(b);
                 }
             } else if (t > G.ntowns) {
@@ -260,6 +285,8 @@ void ui_update(unsigned int p)
     }
     if (toast_t > 0)
         toast_t--;
+    if (happy_t > 0 && --happy_t == 0)
+        happy_town = -1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -292,9 +319,9 @@ static void draw_counts(int x, int y, const int c[NUM_LM])
     char b[8];
     for (k = 0; k < NUM_LM; k++) {
         int gx = x + k * 46;
-        art_landmark(k, (float)gx + 9, (float)y + 8, 16, 255);
+        art_landmark(k, (float)gx + 11, (float)y + 8, 16, 255);
         snprintf(b, sizeof b, "%d", c[k]);
-        gfx_text(&font_small, gx + 20, y, b, c[k] ? COL_TEXT : 0x7D6E9C, 255);
+        gfx_text(&font_small, gx + 24, y, b, c[k] ? COL_TEXT : 0x7D6E9C, 255);
     }
 }
 
@@ -310,8 +337,11 @@ static void draw_town(int i, int selected, int preview)
         gfx_rrect(x + 3, y + 4, TOWN_W, TOWN_H, 12, 0x000000, 90);
         gfx_rrect_border(x, y, TOWN_W, TOWN_H, 12, selected ? 3 : 2, edge, COL_PANEL, 235);
         /* balão com o pedido */
-        gfx_rrect(x + 6, y + 6, TOWN_W - 12, 58, 9, st == ST_BROKEN ? 0xFFD9DE : COL_BUBBLE, 255);
-        gfx_tri((float)x + 22, (float)y + 62, (float)x + 36, (float)y + 62, (float)x + 22, (float)y + 72,
+        gfx_tri((float)x + 20, (float)y + 60, (float)x + 38, (float)y + 60, (float)x + 22, (float)y + 76,
+                COL_OUTLINE, 255);
+        gfx_rrect_border(x + 6, y + 6, TOWN_W - 12, 58, 10, 2, COL_OUTLINE,
+                         st == ST_BROKEN ? 0xFFD9DE : COL_BUBBLE, 255);
+        gfx_tri((float)x + 23, (float)y + 62, (float)x + 35, (float)y + 62, (float)x + 23.5f, (float)y + 72,
                 st == ST_BROKEN ? 0xFFD9DE : COL_BUBBLE, 255);
         card_req_text(&card_db[t->cards[0]], req, sizeof req);
         th = gfx_text_wrap(&font_small, x + 24, 0, TOWN_W - 48, ALIGN_CENTER, 16, req, COL_INK, 255, 0);
@@ -363,11 +393,11 @@ static void draw_town(int i, int selected, int preview)
 static void draw_header(void)
 {
     char b[64];
-    gfx_text_shadow(&font_big, 22, 10, ALIGN_LEFT, "Prefeitos do Além", COL_GOLD, 0x000000);
+    art_title_text(22 + gfx_text_width(&font_big, "Prefeitos do Além") / 2, 9, "Prefeitos do Além", COL_GOLD);
     snprintf(b, sizeof b, "Cartas jogadas: %d/%d", G.played, CARDS_TO_PLAY);
     gfx_text_al(&font_body, 618, 8, ALIGN_RIGHT, b, COL_TEXT, 255);
     if (G.nplayers > 1)
-        snprintf(b, sizeof b, "Vez do Jogador %d de %d", G.player + 1, G.nplayers);
+        snprintf(b, sizeof b, "Vez de %s (jogador %d de %d)", player_names[G.player], G.player + 1, G.nplayers);
     else
         snprintf(b, sizeof b, "Partida solo");
     gfx_text_al(&font_small, 618, 29, ALIGN_RIGHT, b, COL_DIM, 255);
@@ -413,7 +443,7 @@ static void req_bubble(int x, int y, int w, const char *req)
     int th = gfx_text_wrap(&font_small, x + 8, 0, w - 16, ALIGN_LEFT, 16, req, COL_INK, 255, 0);
     if (th < 16)
         th = 16;
-    gfx_rrect(x, y, w, th + 8, 8, COL_BUBBLE, 255);
+    gfx_rrect_border(x, y, w, th + 8, 8, 2, COL_OUTLINE, COL_BUBBLE, 255);
     gfx_text_wrap(&font_small, x + 8, y + 4, w - 16, ALIGN_LEFT, 16, req, COL_INK, 255, 1);
 }
 
@@ -423,8 +453,11 @@ static void draw_info_panel(void)
     int x = 166, y = 340, w = 452;
     gfx_rrect_border(x, y, w, 104, 10, 2, COL_PANEL_EDGE, COL_PANEL, 235);
     if (phase == PH_DRAW) {
+        spr_draw_base(player_avatar[G.nplayers > 1 ? G.player : 5], x + 40, y + 100, 255);
+        x += 70;
+        w -= 70;
         if (G.nplayers > 1)
-            snprintf(b, sizeof b, "Jogador %d: compre uma carta", G.player + 1);
+            snprintf(b, sizeof b, "%s, compre uma carta", player_names[G.player]);
         else
             snprintf(b, sizeof b, "Compre uma carta");
         gfx_text(&font_body, x + 12, y + 6, b, COL_GOLD, 255);
@@ -433,7 +466,7 @@ static void draw_info_panel(void)
             card_req_text(&card_db[G.tourist], req, sizeof req);
             req_bubble(x + 10, y + 48, w - 20, req);
         } else {
-            snprintf(b, sizeof b, "Monte: uma carta surpresa (restam %d).\nEsquerda/direita escolhe entre o monte e o turista.",
+            snprintf(b, sizeof b, "Monte: carta surpresa (restam %d).\nEsquerda/direita: monte ou turista.",
                      G.deck_count);
             gfx_text_wrap(&font_small, x + 12, y + 32, w - 24, ALIGN_LEFT, 17, b, COL_TEXT, 255, 1);
         }
@@ -476,9 +509,11 @@ static void draw_info_panel(void)
             int r = simulate_risk(t);
             if (r >= 0) {
                 snprintf(b, sizeof b, "Cuidado: o pedido da Cidade %d ficaria impossível!", r + 1);
-                gfx_text(&font_small, x + 4, line, b, COL_BAD, 255);
+                spr_draw_center(SPR_FX_EXCLAMACAO, x + 10, line + 8, 255);
+                gfx_text(&font_small, x + 24, line, b, COL_BAD, 255);
             } else {
-                gfx_text(&font_small, x + 4, line, "Dica: nenhum pedido fica impossível.", COL_OK, 255);
+                spr_draw_center(SPR_FX_LAMPADA, x + 10, line + 7, 255);
+                gfx_text(&font_small, x + 24, line, "Dica: nenhum pedido fica impossível.", COL_OK, 255);
             }
         }
         {
@@ -503,14 +538,30 @@ static void draw_game_static(void)
         draw_info_panel();
 }
 
+static int mayor_sprite(int town)
+{
+    int st = game_req_status(&G, town);
+    if (G.result == GS_WON)
+        return SPR_EXPR_RINDO;
+    if (st == ST_BROKEN)
+        return SPR_EXPR_TRISTE;
+    if (town == happy_town)
+        return SPR_EXPR_ANIMADO;
+    if (st == ST_MET)
+        return SPR_EXPR_FELIZ;
+    if (screen == SCR_GAME && phase == PH_PLACE && town == town_sel)
+        return SPR_EXPR_PENSATIVO;
+    return SPR_EXPR_NORMAL;
+}
+
 static void draw_town_ghosts(void)
 {
     int i;
     for (i = 0; i < G.ntowns; i++) {
         int x, y;
-        float bob = sinf((float)(frame + i * 17) * 0.08f) * 2.5f;
+        float bob = sinf((float)(frame + i * 17) * 0.08f) * 2.0f;
         town_xy(i, &x, &y);
-        art_ghost((float)x + 26, (float)y + 92 + bob, 28, 1, 255);
+        spr_draw_base(mayor_sprite(i), x + 26, y + 116 + (int)bob, 255);
     }
 }
 
@@ -545,38 +596,31 @@ static void draw_title_static(void)
 {
     static const char *const items[] = { "Jogar", "Jogadores", "Dicas", "Como jogar" };
     int i;
-    gfx_text_shadow(&font_title, 320, 46, ALIGN_CENTER, "Prefeitos do Além", COL_GOLD, 0x000000);
-    gfx_text_al(&font_body, 320, 104, ALIGN_CENTER, "Fantasminhas cooperativos em busca das cidades perfeitas",
-                COL_DIM, 255);
-    gfx_rrect_border(190, 252, 260, 152, 14, 2, COL_PANEL_EDGE, COL_PANEL, 220);
+    spr_draw(SPR_LOGO_BIG, 320 - spr(SPR_LOGO_BIG)->w / 2, 4, 255);
     for (i = 0; i < 4; i++) {
         char b[48];
-        int y = 262 + i * 34, sel = (i == title_sel);
         if (i == 1)
             snprintf(b, sizeof b, "Jogadores:  < %d >", nplayers);
         else if (i == 2)
             snprintf(b, sizeof b, "Dicas:  %s", hints ? "ligadas" : "desligadas");
         else
             snprintf(b, sizeof b, "%s", items[i]);
-        if (sel)
-            gfx_rrect(204, y - 2, 232, 32, 10, 0x4A3277, 255);
-        gfx_text_al(&font_big, 320, y, ALIGN_CENTER, b, sel ? COL_GOLD : COL_TEXT, 255);
+        art_menu_button(320, 228 + i * 46, 250, 40, b, i == title_sel);
     }
-    gfx_text_al(&font_small, 320, 414, ALIGN_CENTER,
-                "1 a 6 jogadores  -  passem o controle a cada turno  -  PlayStation 2 homebrew", 0x8E7FB0, 255);
 }
 
 static void draw_title_dynamic(void)
 {
-    float b1 = sinf((float)frame * 0.06f) * 6, b2 = sinf((float)frame * 0.05f + 2) * 5;
-    float b3 = sinf((float)frame * 0.07f + 4) * 5;
-    art_ghost(320, 182 + b1, 74, 1, 255);
-    art_ghost(110, 300 + b2, 46, 0, 230);
-    art_ghost(530, 290 + b3, 50, 0, 230);
-    art_landmark(CASA, 70, 380, 50, 255);
-    art_landmark(ARVORE, 150, 384, 50, 255);
-    art_landmark(LAGO, 500, 388, 54, 255);
-    art_landmark(LOJA, 580, 380, 50, 255);
+    /* personagens dos dois lados, flutuando */
+    static const int cx[6] = { 88, 552, 66, 150, 494, 578 };
+    static const int base[6] = { 196, 196, 336, 438, 438, 336 };
+    int i;
+    for (i = 0; i < 6; i++) {
+        float bob = sinf((float)frame * 0.06f + i * 1.3f) * 5;
+        spr_draw_base(title_chars[i], cx[i], base[i] + (int)bob, 255);
+    }
+    if ((frame / 40) % 3 == 0)
+        spr_draw_center(SPR_FX_BRILHO, 470, 40, 255);
 }
 
 static const char *const rule_titles[NUM_RULE_PAGES] = {
@@ -614,9 +658,9 @@ static void draw_rules_static(void)
     char b[32];
     int y;
     gfx_rrect_border(40, 24, 560, 400, 16, 2, COL_PANEL_EDGE, COL_PANEL, 240);
-    gfx_text_shadow(&font_big, 320, 40, ALIGN_CENTER, rule_titles[rules_page], COL_GOLD, 0x000000);
+    art_title_text(320, 38, rule_titles[rules_page], COL_GOLD);
     /* fundo claro para as cores dos marcos aparecerem bem */
-    gfx_rrect(64, 82, 512, 250, 12, COL_BUBBLE, 255);
+    gfx_rrect_border(64, 82, 512, 250, 12, 2, COL_OUTLINE, COL_BUBBLE, 255);
     gfx_text_wrap(&font_body, 84, 94, 472, ALIGN_LEFT, 21, rule_text[rules_page], COL_INK, 255, 1);
     y = 344;
     if (rules_page == 2) {
@@ -634,7 +678,7 @@ static void draw_rules_static(void)
     } else {
         int k;
         for (k = 0; k < 6; k++)
-            art_ghost(170.0f + k * 60, (float)y + 22, 30, 1, 255);
+            spr_draw_base(player_avatar[k], 170 + k * 60, y + 50, 255);
     }
     snprintf(b, sizeof b, "%d / %d", rules_page + 1, NUM_RULE_PAGES);
     gfx_text_al(&font_small, 578, 398, ALIGN_RIGHT, b, COL_DIM, 255);
@@ -650,14 +694,10 @@ static void draw_pause(void)
     static const char *const items[] = { "Continuar", "Como jogar", "Reiniciar partida", "Voltar ao título" };
     int i;
     gfx_fill(0, 0, SCR_W, SCR_H, 0x000000, 140);
-    gfx_rrect_border(200, 110, 240, 220, 16, 2, COL_PANEL_EDGE, COL_PANEL, 250);
-    gfx_text_al(&font_big, 320, 124, ALIGN_CENTER, "Pausa", COL_GOLD, 255);
-    for (i = 0; i < 4; i++) {
-        int y = 172 + i * 36;
-        if (i == pause_sel)
-            gfx_rrect(214, y - 4, 212, 30, 10, 0x4A3277, 255);
-        gfx_text_al(&font_body, 320, y, ALIGN_CENTER, items[i], i == pause_sel ? COL_GOLD : COL_TEXT, 255);
-    }
+    gfx_rrect_border(170, 70, 300, 290, 18, 3, COL_OUTLINE, COL_PANEL, 250);
+    art_title_text(320, 86, "Pausa", COL_GOLD);
+    for (i = 0; i < 4; i++)
+        art_menu_button(320, 136 + i * 52, 260, 40, items[i], i == pause_sel);
 }
 
 static void draw_end_overlay(void)
@@ -674,7 +714,7 @@ static void draw_end_overlay(void)
     gfx_fill(0, 0, SCR_W, SCR_H, 0x000000, 120);
     gfx_rrect_border(90, 96, 460, 250, 18, 3, won ? COL_GOLD : COL_BAD, COL_PANEL, 250);
     gfx_text_shadow(&font_title, 320, 108, ALIGN_CENTER, won ? "Vitória!" : "Derrota...", won ? COL_GOLD : COL_BAD,
-                    0x000000);
+                    COL_OUTLINE);
     if (won) {
         gfx_text_wrap(&font_body, 120, 170, 400, ALIGN_CENTER, 24,
                       "Os 6 prefeitos estão felizes e as cidades do Além brilham na noite!", COL_TEXT, 255, 1);
@@ -682,7 +722,7 @@ static void draw_end_overlay(void)
         card_req_text(&card_db[G.towns[G.fail_town].cards[0]], req, sizeof req);
         snprintf(b, sizeof b, "O pedido da Cidade %d não pode ser cumprido:", G.fail_town + 1);
         gfx_text_wrap(&font_body, 120, 166, 400, ALIGN_CENTER, 22, b, COL_TEXT, 255, 1);
-        gfx_rrect(120, 216, 400, 50, 10, COL_BUBBLE, 255);
+        gfx_rrect_border(120, 216, 400, 50, 10, 2, COL_OUTLINE, COL_BUBBLE, 255);
         gfx_text_wrap(&font_small, 130, 224, 380, ALIGN_CENTER, 17, req, COL_INK, 255, 1);
     }
     {
@@ -694,12 +734,20 @@ static void draw_end_overlay(void)
 
 static void draw_end_dynamic(void)
 {
-    int k;
     if (hide_overlay)
         return;
-    for (k = 0; k < 2; k++) {
-        float b = sinf((float)frame * 0.07f + k * 2) * 6;
-        art_ghost(k ? 500.0f : 140.0f, 140 + b, 50, G.result == GS_WON, 255);
+    if (G.result == GS_WON) {
+        int f = (frame / 6) % 6;
+        spr_draw_base(SPR_FESTA0 + f, 150, 166, 255);
+        spr_draw_base(SPR_FESTA0 + (f + 3) % 6, 490, 166, 255);
+        if ((frame / 12) % 2)
+            spr_draw_center(SPR_FX_ESTRELAS, 200, 106, 255);
+        else
+            spr_draw_center(SPR_FX_BRILHO, 440, 106, 255);
+    } else {
+        float b = sinf((float)frame * 0.05f) * 3;
+        spr_draw_base(SPR_EXPR_BIG_TRISTE, 150, 162 + (int)b, 255);
+        spr_draw_base(SPR_EXPR_BIG_PENSATIVO, 490, 162 - (int)b, 255);
     }
 }
 

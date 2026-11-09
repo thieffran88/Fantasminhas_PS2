@@ -27,5 +27,6 @@ void ui_draw_to(unsigned int *out);
 /* para testes automáticos */
 const Game *ui_game(void);
 int ui_screen(void);
+int ui_town_sel(void);
 
 #endif

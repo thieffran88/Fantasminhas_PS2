@@ -6,9 +6,14 @@ cidades, e cada prefeito tem um pedido que precisa ser cumprido.
 
 ![Título](screenshots/01_titulo.png)
 
-| Partida | Regras | Fim de jogo |
+| Partida | Vitória | Derrota |
 |---|---|---|
-| ![Partida](screenshots/04_turista.png) | ![Regras](screenshots/03_regras_prefeitos.png) | ![Fim](screenshots/07_fim.png) |
+| ![Partida](screenshots/05_jogada.png) | ![Vitória](screenshots/08_vitoria.png) | ![Derrota](screenshots/07_fim.png) |
+
+Cada jogador é um dos fantasminhas (Zaca, Nina, Lili, Beto, Dona Nena e o
+Prefeito Fantasma). O prefeito de cada cidade muda de expressão: normal com o
+pedido em aberto, feliz quando está cumprido, animado ao receber uma carta e
+triste quando o pedido fica impossível.
 
 ## Regras
 
@@ -72,6 +77,15 @@ docker run --rm -v "$PWD":/src -w /src ps2dev/ps2dev:latest \
   sh -c "apk add --no-cache build-base xorriso && make && make iso"
 ```
 
+### Atualizar os sprites
+
+Edite as folhas em `assets/source/` (ou os PNGs em `assets/sprites/`) e rode:
+
+```sh
+python3 tools/extract_sprites.py   # recorta as folhas (precisa de Pillow e numpy)
+python3 tools/gen_sprites.py       # gera src/sprites_data.c e src/sprites_ids.h
+```
+
 ### Versão de PC (testes)
 
 As regras, a arte e a interface são C portável. Há uma build de PC sem janela,
@@ -88,7 +102,12 @@ make -f Makefile.host shots   # gera screenshots/*.png (precisa de Python + Pill
 |---|---|
 | `src/game.c` | motor de regras, baralho de 50 cartas e textos dos pedidos |
 | `src/ui.c` | telas (título, regras, partida, pausa, fim) e controles |
-| `src/art.c` | arte procedural: fantasminhas, marcos, cartas, cenário |
+| `src/art.c` | desenho de marcos, cartas, botões, selos e cenário |
+| `src/sprites.c` | descompressão e desenho dos sprites |
+| `assets/source/` | folhas de sprites originais |
+| `assets/sprites/` | sprites recortados com fundo transparente |
+| `tools/extract_sprites.py` | recorta as folhas em `assets/sprites/` |
+| `tools/gen_sprites.py` | gera `src/sprites_data.c` (paleta + RLE, no tamanho de exibição) |
 | `src/gfx.c` | renderizador por software (formas suavizadas e texto UTF-8) |
 | `src/main_ps2.c` | PS2: vídeo via gsKit (quadro enviado como textura) e controle via libpad |
 | `src/main_host.c` | PC: executa sequências de botões e salva capturas |
@@ -97,7 +116,9 @@ make -f Makefile.host shots   # gera screenshots/*.png (precisa de Python + Pill
 
 ## Créditos
 
-- Mecânicas adaptadas das regras de um jogo de cartas print-and-play. Arte, textos,
+- Mecânicas adaptadas das regras de um jogo de cartas print-and-play. Textos,
   baralho e código são deste projeto.
+- Sprites (logo, personagens, expressões, marcos, efeitos e cenário): folhas de
+  sprites do projeto em `assets/source/`.
 - Fonte [Inter](https://github.com/rsms/inter) (SIL Open Font License 1.1, veja
   `assets/OFL-Inter.txt`).
