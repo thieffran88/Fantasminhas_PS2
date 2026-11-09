@@ -8,7 +8,7 @@
 #   make iso    -> prefeitos_do_alem.iso (precisa de xorriso)
 
 EE_BIN = prefeitos_do_alem.elf
-EE_OBJS = src/main_ps2.o src/ui.o src/game.o src/art.o src/gfx.o src/font_data.o src/sprites.o src/sprites_data.o
+EE_OBJS = src/main_ps2.o src/lang.o src/ui.o src/game.o src/art.o src/gfx.o src/font_data.o src/sprites.o src/sprites_data.o
 
 EE_INCS += -I$(GSKIT)/include -Isrc
 EE_LDFLAGS += -L$(GSKIT)/lib

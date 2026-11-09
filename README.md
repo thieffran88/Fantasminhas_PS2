@@ -4,11 +4,21 @@ Jogo de cartas **cooperativo** para PlayStation 2 (homebrew), de 1 a 6 jogadores
 passando o controle. Os fantasminhas do Além querem eleger prefeitos para 6 novas
 cidades, e cada prefeito tem um pedido que precisa ser cumprido.
 
-![Título](screenshots/01_titulo.png)
+![Abertura](screenshots/01_abertura.png)
 
-| Partida | Vitória | Derrota |
+| Menu | Partida | Vitória |
 |---|---|---|
-| ![Partida](screenshots/05_jogada.png) | ![Vitória](screenshots/08_vitoria.png) | ![Derrota](screenshots/07_fim.png) |
+| ![Menu](screenshots/02_menu.png) | ![Partida](screenshots/05_jogada.png) | ![Vitória](screenshots/08_vitoria.png) |
+
+## Idiomas
+
+O jogo está em **português** (padrão), **inglês** e **espanhol**: menus, regras,
+avisos e os pedidos das 50 cartas. Troque o idioma na tela de abertura
+(direcional esquerda/direita) ou no menu, em **Idioma**.
+
+| English | Español |
+|---|---|
+| ![English](screenshots/12_jogada_en.png) | ![Español](screenshots/11_jogada_es.png) |
 
 Cada jogador é um dos fantasminhas (Zaca, Nina, Lili, Beto, Dona Nena e o
 Prefeito Fantasma). O prefeito de cada cidade muda de expressão: normal com o
@@ -52,6 +62,7 @@ jogada que tornaria algum pedido impossível.
 
 | Botão | Ação |
 |---|---|
+| START / ✕ na abertura | abrir o menu (esquerda/direita troca o idioma) |
 | Direcional | escolher monte/turista e cidades |
 | ✕ | confirmar (comprar / jogar a carta) |
 | ○ | voltar |
@@ -100,8 +111,9 @@ make -f Makefile.host shots   # gera screenshots/*.png (precisa de Python + Pill
 
 | Arquivo | Conteúdo |
 |---|---|
-| `src/game.c` | motor de regras, baralho de 50 cartas e textos dos pedidos |
-| `src/ui.c` | telas (título, regras, partida, pausa, fim) e controles |
+| `src/game.c` | motor de regras, baralho de 50 cartas e textos dos pedidos (3 idiomas) |
+| `src/ui.c` | telas (abertura, menu, regras, partida, pausa, fim) e controles |
+| `src/lang.c` | textos da interface e das regras em português, inglês e espanhol |
 | `src/art.c` | desenho de marcos, cartas, botões, selos e cenário |
 | `src/sprites.c` | descompressão e desenho dos sprites |
 | `assets/source/` | folhas de sprites originais |
@@ -118,7 +130,9 @@ make -f Makefile.host shots   # gera screenshots/*.png (precisa de Python + Pill
 
 - Mecânicas adaptadas das regras de um jogo de cartas print-and-play. Textos,
   baralho e código são deste projeto.
-- Sprites (logo, personagens, expressões, marcos, efeitos e cenário): folhas de
-  sprites do projeto em `assets/source/`.
+- Sprites (personagens, expressões, marcos, efeitos e cenário) e arte da capa:
+  imagens do projeto em `assets/source/`. A capa é recortada de forma a deixar de
+  fora o selo de classificação etária e o logo de editora da arte original, já que
+  o jogo não foi classificado nem é publicado por eles.
 - Fonte [Inter](https://github.com/rsms/inter) (SIL Open Font License 1.1, veja
   `assets/OFL-Inter.txt`).

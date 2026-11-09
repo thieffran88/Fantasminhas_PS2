@@ -62,6 +62,9 @@ CROPS = {
     "fx_estrelas": ("folha1", 1389, 874, 1443, 934, True),
     "fx_vibra": ("folha1", 1313, 933, 1396, 982, True),
     # cenário
+    # capa da tela inicial: recorte que deixa de fora o selo de classificação
+    # e o logo de editora que aparecem nos cantos de baixo da arte
+    "capa": ("capa", 90, 0, 1358, 888, False),
     "bg_noite": ("folha1", 26, 870, 392, 940, False),
     "bg_rua": ("folha1", 419, 866, 684, 944, False),
 }

@@ -1,4 +1,5 @@
 #include "game.h"
+#include "lang.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -73,9 +74,23 @@ const Card card_db[DECK_SIZE] = {
     C(L, S, R_SAME, L, S, 0),
 };
 
-const char *const lm_name_sg[NUM_LM] = { "casa", "árvore", "lago", "loja" };
-const char *const lm_name_pl[NUM_LM] = { "casas", "árvores", "lagos", "lojas" };
-static const int lm_masc[NUM_LM] = { 0, 0, 1, 0 };
+/* nomes dos marcos por idioma: [idioma][tipo] */
+static const char *const lm_sg[NUM_LANGS][NUM_LM] = {
+    { "casa", "árvore", "lago", "loja" },
+    { "house", "tree", "lake", "shop" },
+    { "casa", "árbol", "lago", "tienda" },
+};
+static const char *const lm_pl[NUM_LANGS][NUM_LM] = {
+    { "casas", "árvores", "lagos", "lojas" },
+    { "houses", "trees", "lakes", "shops" },
+    { "casas", "árboles", "lagos", "tiendas" },
+};
+/* gênero masculino (português e espanhol) */
+static const int lm_masc[NUM_LANGS][NUM_LM] = {
+    { 0, 0, 1, 0 },
+    { 0, 0, 0, 0 },
+    { 0, 1, 1, 0 },
+};
 
 /* ------------------------------------------------------------------ */
 
@@ -358,7 +373,7 @@ static void sb_lm(Sb *s, int type, int plural)
     char tag[2] = { (char)(TXT_LM0 + type), 0 };
     char end[2] = { TXT_RESET, 0 };
     sb_put(s, tag);
-    sb_put(s, plural ? lm_name_pl[type] : lm_name_sg[type]);
+    sb_put(s, plural ? lm_pl[g_lang][type] : lm_sg[g_lang][type]);
     sb_put(s, end);
 }
 
@@ -369,83 +384,68 @@ static void sb_num(Sb *s, int n)
     sb_put(s, buf);
 }
 
+/* Textos dos pedidos. Cada linha da tabela é { português, inglês, espanhol };
+ * "@a"/"@b" = marco no plural, "#a"/"#b" = singular, "%n" = número,
+ * "!a"/"!b" = "Nenhum(a)"/"nenhum(a) outro(a)" com a concordância certa. */
+static const char *const req_fmt[11][NUM_LANGS] = {
+    [R_ATLEAST2] = { "Pelo menos 2 @a e 2 @b aqui.", "At least 2 @a and 2 @b here.",
+                     "Al menos 2 @a y 2 @b aquí." },
+    [R_NONE] = { "!a #a aqui.", "No @a here.", "!a #a aquí." },
+    [R_NONE_NOOTHER] = { "!a #a e ?b #b aqui.", "No @a and no other @b here.", "!a #a y ?b #b aquí." },
+    [R_EXACT_TYPES] = { "Exatamente %n tipos de marcos aqui.", "Exactly %n types of landmarks here.",
+                        "Exactamente %n tipos de lugares aquí." },
+    [R_EXACT_COUNT] = { "Exatamente %n @a aqui.", "Exactly %n @a here.", "Exactamente %n @a aquí." },
+    [R_MOST] = { "Mais @a que qualquer outra cidade.", "More @a than any other town.",
+                 "Más @a que cualquier otra ciudad." },
+    [R_TOWNS_WITH] = { "Exatamente %n cidades com @a.", "Exactly %n towns with @a.",
+                       "Exactamente %n ciudades con @a." },
+    [R_TOWNS_BOTH] = { "Exatamente %n cidades com @a e @b.", "Exactly %n towns with @a and @b.",
+                       "Exactamente %n ciudades con @a y @b." },
+    [R_MORE_THAN] = { "Mais @a do que @b aqui.", "More @a than @b here.", "Más @a que @b aquí." },
+    [R_SAME] = { "Mesmo número de @a e @b aqui.", "Same number of @a and @b here.",
+                 "Mismo número de @a y @b aquí." },
+    [R_ALL_TOWNS] = { "Todas as cidades têm @a.", "Every town has @a.", "Todas las ciudades tienen @a." },
+};
+
+static const char *none_word(int lang, int type)
+{
+    if (lang == LANG_ES)
+        return lm_masc[lang][type] ? "Ningún" : "Ninguna";
+    return lm_masc[lang][type] ? "Nenhum" : "Nenhuma";
+}
+
+static const char *none_other_word(int lang, int type)
+{
+    if (lang == LANG_ES)
+        return lm_masc[lang][type] ? "ningún otro" : "ninguna otra";
+    return lm_masc[lang][type] ? "nenhum outro" : "nenhuma outra";
+}
+
 void card_req_text(const Card *c, char *out, int outsz)
 {
     Sb s;
+    const char *f = req_fmt[c->req][g_lang];
     s.p = out;
     s.left = outsz;
     out[0] = 0;
-    switch (c->req) {
-    case R_ATLEAST2:
-        sb_put(&s, "Pelo menos 2 ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, " e 2 ");
-        sb_lm(&s, c->b, 1);
-        sb_put(&s, " aqui.");
-        break;
-    case R_NONE:
-        sb_put(&s, lm_masc[c->a] ? "Nenhum " : "Nenhuma ");
-        sb_lm(&s, c->a, 0);
-        sb_put(&s, " aqui.");
-        break;
-    case R_NONE_NOOTHER:
-        sb_put(&s, lm_masc[c->a] ? "Nenhum " : "Nenhuma ");
-        sb_lm(&s, c->a, 0);
-        sb_put(&s, lm_masc[c->b] ? " e nenhum outro " : " e nenhuma outra ");
-        sb_lm(&s, c->b, 0);
-        sb_put(&s, " aqui.");
-        break;
-    case R_EXACT_TYPES:
-        sb_put(&s, "Exatamente ");
-        sb_num(&s, c->n);
-        sb_put(&s, " tipos de marcos aqui.");
-        break;
-    case R_EXACT_COUNT:
-        sb_put(&s, "Exatamente ");
-        sb_num(&s, c->n);
-        sb_put(&s, " ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, " aqui.");
-        break;
-    case R_MOST:
-        sb_put(&s, "Mais ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, " que qualquer outra cidade.");
-        break;
-    case R_TOWNS_WITH:
-        sb_put(&s, "Exatamente ");
-        sb_num(&s, c->n);
-        sb_put(&s, " cidades com ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, ".");
-        break;
-    case R_TOWNS_BOTH:
-        sb_put(&s, "Exatamente ");
-        sb_num(&s, c->n);
-        sb_put(&s, " cidades com ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, " e ");
-        sb_lm(&s, c->b, 1);
-        sb_put(&s, ".");
-        break;
-    case R_MORE_THAN:
-        sb_put(&s, "Mais ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, " do que ");
-        sb_lm(&s, c->b, 1);
-        sb_put(&s, " aqui.");
-        break;
-    case R_SAME:
-        sb_put(&s, "Mesmo número de ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, " e ");
-        sb_lm(&s, c->b, 1);
-        sb_put(&s, " aqui.");
-        break;
-    case R_ALL_TOWNS:
-        sb_put(&s, "Todas as cidades têm ");
-        sb_lm(&s, c->a, 1);
-        sb_put(&s, ".");
-        break;
+    while (*f) {
+        if ((f[0] == '@' || f[0] == '#' || f[0] == '!' || f[0] == '?') && (f[1] == 'a' || f[1] == 'b')) {
+            int type = f[1] == 'a' ? c->a : c->b;
+            if (f[0] == '@')
+                sb_lm(&s, type, 1);
+            else if (f[0] == '#')
+                sb_lm(&s, type, 0);
+            else if (f[0] == '!')
+                sb_put(&s, none_word(g_lang, type));
+            else
+                sb_put(&s, none_other_word(g_lang, type));
+            f += 2;
+        } else if (f[0] == '%' && f[1] == 'n') {
+            sb_num(&s, c->n);
+            f += 2;
+        } else {
+            char ch[2] = { *f++, 0 };
+            sb_put(&s, ch);
+        }
     }
 }

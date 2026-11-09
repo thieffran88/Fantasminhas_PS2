@@ -21,11 +21,9 @@ EXPRS = ["normal", "feliz", "animado", "surpreso", "pensativo", "preocupado", "c
 
 # (ID em C, arquivo, ("w"|"h", tamanho))
 TABLE = [
-    ("LOGO_BIG", "logo", ("w", 300)),
+    ("CAPA", "capa", ("w", 640)),
     ("BG_NOITE", "bg_noite", ("w", 640)),
 ]
-for c in CHARS:
-    TABLE.append((f"CHAR_{c.upper()}", f"char_{c}", ("h", 108)))
 for c in CHARS:
     TABLE.append((f"AVATAR_{c.upper()}", f"char_{c}", ("h", 66)))
 for e in EXPRS:

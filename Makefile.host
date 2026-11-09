@@ -5,7 +5,7 @@
 
 CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter -std=c99 -D_DEFAULT_SOURCE
-SRC = src/game.c src/gfx.c src/font_data.c src/art.c src/ui.c src/sprites.c src/sprites_data.c
+SRC = src/lang.c src/game.c src/gfx.c src/font_data.c src/art.c src/ui.c src/sprites.c src/sprites_data.c
 
 all: build/prefeitos_host
 
@@ -15,8 +15,8 @@ build:
 build/prefeitos_host: $(SRC) src/main_host.c src/*.h | build
 	$(CC) $(CFLAGS) -o $@ $(SRC) src/main_host.c -lm
 
-build/test_rules: src/game.c src/game.h tests/test_rules.c | build
-	$(CC) $(CFLAGS) -o $@ src/game.c tests/test_rules.c -lm
+build/test_rules: src/lang.c src/game.c src/game.h tests/test_rules.c | build
+	$(CC) $(CFLAGS) -o $@ src/lang.c src/game.c tests/test_rules.c -lm
 
 test: build/test_rules
 	./build/test_rules

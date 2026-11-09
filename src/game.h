@@ -73,8 +73,6 @@ typedef struct {
 } Game;
 
 extern const Card card_db[DECK_SIZE];
-extern const char *const lm_name_sg[NUM_LM];
-extern const char *const lm_name_pl[NUM_LM];
 
 unsigned int game_rand(Game *g);
 void game_init(Game *g, int nplayers, unsigned int seed);
