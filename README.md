@@ -10,6 +10,25 @@ cidades, e cada prefeito tem um pedido que precisa ser cumprido.
 |---|---|---|
 | ![Menu](screenshots/02_menu.png) | ![Partida](screenshots/05_jogada.png) | ![Vitória](screenshots/08_vitoria.png) |
 
+## Música e efeitos sonoros
+
+Todo o som é sintetizado em tempo real pelo próprio jogo (nenhum arquivo de
+áudio), com instrumentos de "filme de fantasma":
+
+- **Título:** valsa assombrada em lá menor com theremin, órgão e contrabaixo pizzicato.
+- **Partida:** caixinha de música em ré menor com pad suave.
+- **Vitória / derrota:** fanfarra com sinos / lamento de theremin.
+- **Efeitos:** cursor, comprar e jogar carta, "uuuuu" de fantasma ao eleger um
+  prefeito, brilho quando um pedido é cumprido, aviso grave quando o cursor está
+  numa jogada perigosa (com dicas ligadas), pausa, páginas e erros.
+
+Música e efeitos podem ser desligados no menu inicial. No PS2 o som sai pelo
+`audsrv` (módulo embutido no ELF), numa thread própria. Para ouvir no PC:
+
+```sh
+make -f Makefile.host && mkdir -p build/audio && ./build/prefeitos_host --audio build/audio
+```
+
 ## Idiomas
 
 O jogo está em **português** (padrão), **inglês** e **espanhol**: menus, regras,
@@ -72,8 +91,9 @@ jogada que tornaria algum pedido impossível.
 
 ## Como rodar
 
-O CI do GitHub (aba **Actions**) compila o jogo a cada push e publica o artefato
-`prefeitos-do-alem-ps2` com:
+Baixe a versão mais recente em **[Releases](https://github.com/thieffran88/Fantasminhas_PS2/releases)**.
+O CI do GitHub também compila o jogo a cada push (aba **Actions**, artefato
+`prefeitos-do-alem-ps2`), e ao enviar uma tag `v*` publica um release com:
 
 - `prefeitos_do_alem.elf`: rode no **PCSX2** (*Sistema → Iniciar ELF*) ou num PS2
   real pelo **uLaunchELF/wLaunchELF** (pendrive USB).
@@ -113,6 +133,7 @@ make -f Makefile.host shots   # gera screenshots/*.png (precisa de Python + Pill
 |---|---|
 | `src/game.c` | motor de regras, baralho de 50 cartas e textos dos pedidos (3 idiomas) |
 | `src/ui.c` | telas (abertura, menu, regras, partida, pausa, fim) e controles |
+| `src/audio.c` | sintetizador, músicas e efeitos sonoros |
 | `src/lang.c` | textos da interface e das regras em português, inglês e espanhol |
 | `src/art.c` | desenho de marcos, cartas, botões, selos e cenário |
 | `src/sprites.c` | descompressão e desenho dos sprites |

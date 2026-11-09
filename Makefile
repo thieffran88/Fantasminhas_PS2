@@ -8,14 +8,18 @@
 #   make iso    -> prefeitos_do_alem.iso (precisa de xorriso)
 
 EE_BIN = prefeitos_do_alem.elf
-EE_OBJS = src/main_ps2.o src/lang.o src/ui.o src/game.o src/art.o src/gfx.o src/font_data.o src/sprites.o src/sprites_data.o
+EE_OBJS = src/main_ps2.o src/audsrv_irx.o src/audio.o src/lang.o src/ui.o src/game.o src/art.o src/gfx.o src/font_data.o src/sprites.o src/sprites_data.o
 
 EE_INCS += -I$(GSKIT)/include -Isrc
 EE_LDFLAGS += -L$(GSKIT)/lib
-EE_LIBS += -lgskit -ldmakit -lpad -lm
+EE_LIBS += -lgskit -ldmakit -laudsrv -lpad -lpatches -lm
 EE_CFLAGS += -O2 -Wall
 
 all: $(EE_BIN)
+
+# o módulo do IOP que toca o som vai embutido no ELF
+src/audsrv_irx.c: $(PS2SDK)/iop/irx/audsrv.irx
+	$(PS2SDK)/bin/bin2c $< $@ audsrv_irx
 
 iso: $(EE_BIN)
 	rm -rf build/iso
@@ -25,7 +29,7 @@ iso: $(EE_BIN)
 	xorriso -as mkisofs -iso-level 1 -V PREFEITOS_DO_ALEM -o prefeitos_do_alem.iso build/iso
 
 clean:
-	rm -f $(EE_BIN) $(EE_OBJS) prefeitos_do_alem.iso
+	rm -f $(EE_BIN) $(EE_OBJS) src/audsrv_irx.c prefeitos_do_alem.iso
 	rm -rf build/iso
 
 include $(PS2SDK)/samples/Makefile.pref

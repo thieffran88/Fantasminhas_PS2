@@ -8,6 +8,7 @@
 #include "gfx.h"
 #include "sprites.h"
 #include "lang.h"
+#include "audio.h"
 
 enum { SCR_TITLE, SCR_RULES, SCR_GAME, SCR_PAUSE, SCR_END };
 enum { PH_DRAW, PH_PLACE };
@@ -25,6 +26,7 @@ static Game G;
 static int screen = SCR_TITLE, rules_return = SCR_TITLE;
 static int frame;
 static int title_sel, nplayers = 2, hints = 1, title_menu;
+static int music_on = 1, sfx_on = 1, cur_music = -1;
 static int rules_page;
 static int phase, draw_sel, town_sel, pause_sel;
 static unsigned int seed;
@@ -62,6 +64,8 @@ static void slot_xy(int town, int k, int *x, int *y)
     *x = tx + 50 + k * (CARD_W + 2);
     *y = ty + 70;
 }
+
+static int simulate_risk(int town);
 
 static void set_toast(const char *s)
 {
@@ -106,6 +110,7 @@ void ui_init(unsigned int s)
     seed = s;
     sprites_init();
     art_init();
+    audio_init();
     screen = SCR_TITLE;
     dirty = 1;
 }
@@ -120,60 +125,91 @@ static void open_rules(void)
     rules_page = 0;
 }
 
-#define TITLE_ITEMS 5
+enum { TI_PLAY, TI_PLAYERS, TI_HINTS, TI_MUSIC, TI_SFX, TI_LANG, TI_HOWTO, TITLE_ITEMS };
 
 static void update_title(unsigned int p)
 {
+    int lr = (p & (B_LEFT | B_RIGHT)) != 0;
     if (!title_menu) {
         /* tela de abertura: esquerda/direita troca o idioma */
-        if (p & (B_LEFT | B_RIGHT))
+        if (lr) {
             g_lang = (g_lang + ((p & B_RIGHT) ? 1 : NUM_LANGS - 1)) % NUM_LANGS;
+            audio_sfx(SFX_MOVE);
+        }
         if (p & (B_START | B_CROSS)) {
             title_menu = 1;
             title_sel = 0;
+            audio_sfx(SFX_START);
         }
         return;
     }
     if (p & B_CIRCLE) {
         title_menu = 0;
+        audio_sfx(SFX_BACK);
         return;
     }
-    if (p & B_UP)
-        title_sel = (title_sel + TITLE_ITEMS - 1) % TITLE_ITEMS;
-    if (p & B_DOWN)
-        title_sel = (title_sel + 1) % TITLE_ITEMS;
-    if (title_sel == 1 && (p & (B_LEFT | B_RIGHT))) {
-        nplayers += (p & B_RIGHT) ? 1 : -1;
-        if (nplayers < 1) nplayers = 6;
-        if (nplayers > 6) nplayers = 1;
+    if (p & (B_UP | B_DOWN)) {
+        title_sel = (title_sel + ((p & B_UP) ? TITLE_ITEMS - 1 : 1)) % TITLE_ITEMS;
+        audio_sfx(SFX_MOVE);
     }
-    if (title_sel == 2 && (p & (B_LEFT | B_RIGHT | B_CROSS)))
-        hints = !hints;
-    if (title_sel == 3 && (p & (B_LEFT | B_RIGHT | B_CROSS)))
-        g_lang = (g_lang + ((p & B_LEFT) ? NUM_LANGS - 1 : 1)) % NUM_LANGS;
+    if (lr || (p & B_CROSS)) {
+        int fwd = !(p & B_LEFT);
+        switch (title_sel) {
+        case TI_PLAYERS:
+            nplayers = fwd ? nplayers % 6 + 1 : (nplayers + 4) % 6 + 1;
+            audio_sfx(SFX_MOVE);
+            break;
+        case TI_HINTS:
+            hints = !hints;
+            audio_sfx(SFX_MOVE);
+            break;
+        case TI_MUSIC:
+            music_on = !music_on;
+            audio_set_enabled(music_on, sfx_on);
+            audio_sfx(SFX_MOVE);
+            break;
+        case TI_SFX:
+            sfx_on = !sfx_on;
+            audio_set_enabled(music_on, sfx_on);
+            audio_sfx(SFX_CONFIRM); /* só toca se acabou de ligar */
+            break;
+        case TI_LANG:
+            g_lang = (g_lang + (fwd ? 1 : NUM_LANGS - 1)) % NUM_LANGS;
+            audio_sfx(SFX_MOVE);
+            break;
+        default: break;
+        }
+    }
     if (p & (B_CROSS | B_START)) {
-        if (title_sel == 0 || (p & B_START))
+        if (title_sel == TI_PLAY || (p & B_START)) {
+            audio_sfx(SFX_CONFIRM);
             new_game();
-        else if (title_sel == 4)
+        } else if (title_sel == TI_HOWTO) {
+            audio_sfx(SFX_PAGE);
             open_rules();
-        else if (title_sel == 1 && (p & B_CROSS))
-            nplayers = nplayers % 6 + 1;
+        }
     }
 }
 
 static void update_rules(unsigned int p)
 {
     if (p & (B_RIGHT | B_CROSS | B_R1)) {
-        if (rules_page < NUM_RULE_PAGES - 1)
+        if (rules_page < NUM_RULE_PAGES - 1) {
             rules_page++;
-        else if (p & B_CROSS)
+            audio_sfx(SFX_PAGE);
+        } else if (p & B_CROSS) {
             screen = rules_return;
+            audio_sfx(SFX_BACK);
+        }
     }
-    if (p & (B_LEFT | B_L1))
-        if (rules_page > 0)
-            rules_page--;
-    if (p & (B_CIRCLE | B_TRIANGLE | B_START))
+    if ((p & (B_LEFT | B_L1)) && rules_page > 0) {
+        rules_page--;
+        audio_sfx(SFX_PAGE);
+    }
+    if (p & (B_CIRCLE | B_TRIANGLE | B_START)) {
         screen = rules_return;
+        audio_sfx(SFX_BACK);
+    }
 }
 
 static void move_town_cursor(unsigned int p)
@@ -195,15 +231,19 @@ static void update_game(unsigned int p)
     if (p & B_START) {
         screen = SCR_PAUSE;
         pause_sel = 0;
+        audio_sfx(SFX_PAUSE);
         return;
     }
     if (p & B_TRIANGLE) {
+        audio_sfx(SFX_PAGE);
         open_rules();
         return;
     }
     if (phase == PH_DRAW) {
-        if (p & (B_LEFT | B_RIGHT))
+        if (p & (B_LEFT | B_RIGHT)) {
             draw_sel = !draw_sel;
+            audio_sfx(SFX_MOVE);
+        }
         if (draw_sel == 1 && G.tourist < 0)
             draw_sel = 0;
         if (p & B_CROSS) {
@@ -211,15 +251,29 @@ static void update_game(unsigned int p)
             if (ok) {
                 phase = PH_PLACE;
                 town_sel = first_valid_town();
+                audio_sfx(SFX_DRAW);
             }
         }
     } else {
-        if (p & (B_LEFT | B_RIGHT | B_UP | B_DOWN))
+        if (p & (B_LEFT | B_RIGHT | B_UP | B_DOWN)) {
             move_town_cursor(p);
+            /* com dicas ligadas, um som grave avisa que a jogada é perigosa */
+            audio_sfx(hints && game_can_play(&G, town_sel) && simulate_risk(town_sel) >= 0 ? SFX_WARN : SFX_MOVE);
+        }
         if (p & B_CROSS) {
             int t = town_sel, newtown = (t == G.ntowns);
             int slot = newtown ? 0 : G.towns[t].ncards;
+            int k, met_before = 0, met_after = 0;
+            for (k = 0; k < G.ntowns; k++)
+                met_before += game_req_status(&G, k) == ST_MET;
             if (game_play(&G, t)) {
+                for (k = 0; k < G.ntowns; k++)
+                    met_after += game_req_status(&G, k) == ST_MET;
+                audio_sfx(SFX_PLACE);
+                if (newtown)
+                    audio_sfx(SFX_MAYOR);
+                else if (met_after > met_before)
+                    audio_sfx(SFX_MET);
                 anim_t = 0;
                 anim_town = t;
                 anim_slot = slot;
@@ -238,8 +292,10 @@ static void update_game(unsigned int p)
                 }
             } else if (t > G.ntowns) {
                 set_toast(TR(S_FOUND_IN_ORDER));
+                audio_sfx(SFX_ERROR);
             } else {
                 set_toast(TR(S_TOWN_FULL_TOAST));
+                audio_sfx(SFX_ERROR);
             }
         }
     }
@@ -247,13 +303,17 @@ static void update_game(unsigned int p)
 
 static void update_pause(unsigned int p)
 {
-    if (p & B_UP) pause_sel = (pause_sel + 3) % 4;
-    if (p & B_DOWN) pause_sel = (pause_sel + 1) % 4;
+    if (p & (B_UP | B_DOWN)) {
+        pause_sel = (pause_sel + ((p & B_UP) ? 3 : 1)) % 4;
+        audio_sfx(SFX_MOVE);
+    }
     if (p & (B_CIRCLE | B_START)) {
         screen = SCR_GAME;
+        audio_sfx(SFX_BACK);
         return;
     }
     if (p & B_CROSS) {
+        audio_sfx(SFX_CONFIRM);
         switch (pause_sel) {
         case 0: screen = SCR_GAME; break;
         case 1: screen = SCR_GAME; open_rules(); break;
@@ -265,11 +325,15 @@ static void update_pause(unsigned int p)
 
 static void update_end(unsigned int p)
 {
-    if (p & B_SQUARE)
+    if (p & B_SQUARE) {
         hide_overlay = !hide_overlay;
-    if (p & (B_CROSS | B_START))
+        audio_sfx(SFX_MOVE);
+    }
+    if (p & (B_CROSS | B_START)) {
+        audio_sfx(SFX_CONFIRM);
         new_game();
-    else if (p & B_CIRCLE) {
+    } else if (p & B_CIRCLE) {
+        audio_sfx(SFX_BACK);
         screen = SCR_TITLE;
         title_menu = 1;
     }
@@ -307,6 +371,24 @@ void ui_update(unsigned int p)
         toast_t--;
     if (happy_t > 0 && --happy_t == 0)
         happy_town = -1;
+    /* trilha: valsa no título, caixinha de música na partida, jingle no fim */
+    {
+        int want = cur_music;
+        int in_game = screen == SCR_GAME || screen == SCR_PAUSE || screen == SCR_END ||
+                      (screen == SCR_RULES && rules_return != SCR_TITLE);
+        if (!in_game)
+            want = MUS_TITLE;
+        else if (G.result == GS_WON)
+            want = MUS_WIN;
+        else if (G.result == GS_LOST)
+            want = MUS_LOSE;
+        else
+            want = MUS_GAME;
+        if (want != cur_music) {
+            cur_music = want;
+            audio_music(want);
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -628,13 +710,15 @@ static void draw_title_static(void)
     for (i = 0; i < TITLE_ITEMS; i++) {
         char b[64];
         switch (i) {
-        case 0: snprintf(b, sizeof b, "%s", TR(S_MENU_PLAY)); break;
-        case 1: snprintf(b, sizeof b, "%s:  < %d >", TR(S_MENU_PLAYERS), nplayers); break;
-        case 2: snprintf(b, sizeof b, "%s:  %s", TR(S_MENU_HINTS), hints ? TR(S_HINTS_ON) : TR(S_HINTS_OFF)); break;
-        case 3: snprintf(b, sizeof b, "%s:  < %s >", TR(S_MENU_LANGUAGE), TR(S_LANG_NAME)); break;
+        case TI_PLAY: snprintf(b, sizeof b, "%s", TR(S_MENU_PLAY)); break;
+        case TI_PLAYERS: snprintf(b, sizeof b, "%s:  < %d >", TR(S_MENU_PLAYERS), nplayers); break;
+        case TI_HINTS: snprintf(b, sizeof b, "%s:  %s", TR(S_MENU_HINTS), hints ? TR(S_HINTS_ON) : TR(S_HINTS_OFF)); break;
+        case TI_MUSIC: snprintf(b, sizeof b, "%s:  %s", TR(S_MENU_MUSIC), music_on ? TR(S_YES) : TR(S_NO)); break;
+        case TI_SFX: snprintf(b, sizeof b, "%s:  %s", TR(S_MENU_SFX), sfx_on ? TR(S_YES) : TR(S_NO)); break;
+        case TI_LANG: snprintf(b, sizeof b, "%s:  < %s >", TR(S_MENU_LANGUAGE), TR(S_LANG_NAME)); break;
         default: snprintf(b, sizeof b, "%s", TR(S_MENU_HOWTO)); break;
         }
-        art_menu_button(320, 184 + i * 48, 330, 40, b, i == title_sel);
+        art_menu_button(320, 152 + i * 41, 340, 35, b, i == title_sel);
     }
 }
 

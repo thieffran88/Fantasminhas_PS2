@@ -10,7 +10,7 @@ rm -f "$OUT"/*.png
 # abertura (capa) e menu; X na abertura abre o menu, X no menu começa a partida
 $B w10 @$OUT/01_abertura.ppm >/dev/null
 $B X w2 @$OUT/02_menu.ppm >/dev/null
-$B X D D D D X w2 R R @$OUT/03_regras.ppm >/dev/null
+$B X D D D D D D X w2 R R @$OUT/03_regras.ppm >/dev/null
 
 # meio de partida com jogadas automáticas: procura uma semente que chegue
 # a 13 cartas sem perder

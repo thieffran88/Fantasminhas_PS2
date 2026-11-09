@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "audio.h"
 #include "gfx.h"
 #include "ui.h"
 
@@ -107,10 +108,70 @@ static void auto_turn(void)
     press(B_CROSS);
 }
 
+static void write_wav(const char *path, const short *pcm, int n)
+{
+    FILE *f = fopen(path, "wb");
+    unsigned int v;
+    if (!f) {
+        perror(path);
+        return;
+    }
+#define W32(x) (v = (x), fwrite(&v, 4, 1, f))
+#define W16(x) do { unsigned short h = (unsigned short)(x); fwrite(&h, 2, 1, f); } while (0)
+    fwrite("RIFF", 1, 4, f);
+    W32(36 + n * 2);
+    fwrite("WAVEfmt ", 1, 8, f);
+    W32(16);
+    W16(1);
+    W16(1);
+    W32(AUDIO_RATE);
+    W32(AUDIO_RATE * 2);
+    W16(2);
+    W16(16);
+    fwrite("data", 1, 4, f);
+    W32(n * 2);
+    fwrite(pcm, 2, n, f);
+    fclose(f);
+}
+
+/* grava as músicas e os efeitos em WAV para ouvir/conferir */
+static int render_audio(const char *dir)
+{
+    static short pcm[AUDIO_RATE * 80];
+    static const char *const mus_names[NUM_MUSIC] = { "", "musica_titulo", "musica_partida", "vitoria", "derrota" };
+    char path[256];
+    int m, k, n;
+    audio_init();
+    for (m = 1; m < NUM_MUSIC; m++) {
+        int secs = m <= MUS_GAME ? 75 : 6;
+        audio_music(m);
+        n = AUDIO_RATE * secs;
+        audio_render(pcm, n);
+        audio_music(MUS_NONE);
+        audio_render(pcm + n - 1, 1);
+        snprintf(path, sizeof path, "%s/%s.wav", dir, mus_names[m]);
+        write_wav(path, pcm, n);
+        /* deixa as vozes silenciarem */
+        { static short tmp[AUDIO_RATE]; audio_render(tmp, AUDIO_RATE); }
+    }
+    /* todos os efeitos em sequência, 0,9 s cada */
+    n = 0;
+    for (k = 0; k < NUM_SFX; k++) {
+        audio_sfx(k);
+        audio_render(pcm + n, AUDIO_RATE * 9 / 10);
+        n += AUDIO_RATE * 9 / 10;
+    }
+    snprintf(path, sizeof path, "%s/efeitos.wav", dir);
+    write_wav(path, pcm, n);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int i = 1;
     unsigned int seed = 42;
+    if (argc > 2 && !strcmp(argv[1], "--audio"))
+        return render_audio(argv[2]);
     if (argc > 2 && !strcmp(argv[1], "--seed")) {
         seed = (unsigned)strtoul(argv[2], 0, 10);
         i = 3;

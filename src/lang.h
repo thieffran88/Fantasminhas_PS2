@@ -15,6 +15,10 @@ enum {
     S_HINTS_ON,
     S_HINTS_OFF,
     S_MENU_LANGUAGE,
+    S_MENU_MUSIC,
+    S_MENU_SFX,
+    S_YES,
+    S_NO,
     S_MENU_HOWTO,
     S_GOOD_LUCK_STARTS,   /* %s */
     S_GOOD_LUCK_SOLO,

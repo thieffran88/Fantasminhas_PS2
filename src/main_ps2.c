@@ -12,6 +12,8 @@
 #include <loadfile.h>
 #include <iopcontrol.h>
 #include <libpad.h>
+#include <audsrv.h>
+#include <sbv_patches.h>
 #include <malloc.h>
 #include <string.h>
 #include <time.h>
@@ -19,8 +21,14 @@
 #include <dmaKit.h>
 #include <gsKit.h>
 
+#include "audio.h"
 #include "gfx.h"
 #include "ui.h"
+
+/* módulo IRX do audsrv embutido no ELF (gerado com bin2c no Makefile) */
+extern unsigned char audsrv_irx[];
+extern unsigned int size_audsrv_irx;
+extern void *_gp;
 
 static char pad_buf[256] __attribute__((aligned(64)));
 static int pad_ok;
@@ -33,6 +41,60 @@ static void reset_iop(void)
     while (!SifIopSync()) {
     }
     SifInitRpc(0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Som: uma thread de prioridade maior que a do jogo mixa e envia blocos ao
+ * audsrv. audsrv_wait_audio() bloqueia até haver espaço, então a thread do
+ * jogo segue rodando e o som não engasga quando a tela demora a desenhar. */
+
+#define AUDIO_CHUNK 512
+static short audio_buf[AUDIO_CHUNK] __attribute__((aligned(64)));
+static unsigned char audio_stack[0x8000] __attribute__((aligned(16)));
+static int audio_ok;
+
+static void audio_thread(void *arg)
+{
+    (void)arg;
+    while (1) {
+        audio_render(audio_buf, AUDIO_CHUNK);
+        audsrv_wait_audio(sizeof audio_buf);
+        audsrv_play_audio((char *)audio_buf, sizeof audio_buf);
+    }
+}
+
+static void init_audio(void)
+{
+    struct audsrv_fmt_t fmt;
+    ee_thread_t th;
+    int ret, tid;
+
+    if (SifLoadModule("rom0:LIBSD", 0, NULL) < 0)
+        return;
+    if (SifExecModuleBuffer(audsrv_irx, size_audsrv_irx, 0, NULL, &ret) < 0 || ret < 0)
+        return;
+    if (audsrv_init() != 0)
+        return;
+    fmt.freq = AUDIO_RATE;
+    fmt.bits = 16;
+    fmt.channels = 1;
+    if (audsrv_set_format(&fmt) != 0)
+        return;
+    audsrv_set_volume(MAX_VOLUME);
+
+    /* a thread do jogo fica com prioridade menor que a do som */
+    ChangeThreadPriority(GetThreadId(), 0x40);
+    memset(&th, 0, sizeof th);
+    th.func = (void *)audio_thread;
+    th.stack = audio_stack;
+    th.stack_size = sizeof audio_stack;
+    th.gp_reg = &_gp;
+    th.initial_priority = 0x30;
+    tid = CreateThread(&th);
+    if (tid < 0)
+        return;
+    StartThread(tid, NULL);
+    audio_ok = 1;
 }
 
 static void init_pad(void)
@@ -90,6 +152,7 @@ int main(int argc, char *argv[])
     (void)argv;
 
     reset_iop();
+    sbv_patch_enable_lmb(); /* permite carregar IRX a partir da memória */
     init_pad();
 
     gs = gsKit_init_global();
@@ -113,7 +176,8 @@ int main(int argc, char *argv[])
     tex.Filter = GS_FILTER_LINEAR;
     tex.Mem = memalign(128, gsKit_texture_size_ee(SCR_W, SCR_H, GS_PSM_CT32));
 
-    ui_init((unsigned int)clock() ^ 0x5EED1234u);
+    ui_init((unsigned int)clock() ^ 0x5EED1234u); /* também inicia o mixer */
+    init_audio();
 
     while (1) {
         ui_update(read_pad());
