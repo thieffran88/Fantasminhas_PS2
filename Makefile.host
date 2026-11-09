@@ -1,0 +1,30 @@
+# Build de PC (Linux/macOS) para testes e capturas de tela.
+#   make -f Makefile.host          -> compila build/prefeitos_host
+#   make -f Makefile.host test     -> roda os testes de regras
+#   make -f Makefile.host shots    -> gera capturas em screenshots/
+
+CC ?= cc
+CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter -std=c99 -D_DEFAULT_SOURCE
+SRC = src/game.c src/gfx.c src/font_data.c src/art.c src/ui.c
+
+all: build/prefeitos_host
+
+build:
+	mkdir -p build
+
+build/prefeitos_host: $(SRC) src/main_host.c src/*.h | build
+	$(CC) $(CFLAGS) -o $@ $(SRC) src/main_host.c -lm
+
+build/test_rules: src/game.c src/game.h tests/test_rules.c | build
+	$(CC) $(CFLAGS) -o $@ src/game.c tests/test_rules.c -lm
+
+test: build/test_rules
+	./build/test_rules
+
+shots: build/prefeitos_host
+	./tools/screenshots.sh
+
+clean:
+	rm -rf build
+
+.PHONY: all test shots clean

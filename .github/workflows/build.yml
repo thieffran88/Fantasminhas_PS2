@@ -1,0 +1,33 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    name: Testes de regras (PC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -f Makefile.host all test
+
+  ps2:
+    name: PlayStation 2 (ELF + ISO)
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: Dependências
+        run: apk add --no-cache build-base git xorriso
+      - uses: actions/checkout@v4
+      - name: Compilar ELF
+        run: make
+      - name: Gerar ISO
+        run: make iso
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prefeitos-do-alem-ps2
+          path: |
+            prefeitos_do_alem.elf
+            prefeitos_do_alem.iso
